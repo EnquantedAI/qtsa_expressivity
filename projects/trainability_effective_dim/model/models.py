@@ -10,8 +10,17 @@ from src.models import draw_circuit, gqnn_shape, zz_feature_map
 import torch
 import pennylane as qml
 
-def gqnn(n_layers, n_qubits, dev, interface='torch', diff_method='torch', fm_style='zzfm', meas=[0]):
-    
+
+def gqnn(
+    n_layers,
+    n_qubits,
+    dev,
+    interface="torch",
+    diff_method="torch",
+    fm_style="zzfm",
+    meas=[0],
+):
+
     @qml.qnode(dev, interface=interface, diff_method=diff_method)
     def circuit(inputs, weights):
         nonlocal n_layers, n_qubits, dev
@@ -25,7 +34,7 @@ def gqnn(n_layers, n_qubits, dev, interface='torch', diff_method='torch', fm_sty
             zz_feature_map(inputs, wires)
         else:
             qml.AngleEmbedding(inputs, wires=range(n_qubits), rotation=fm_style)
-        
+
         qml.Barrier()
 
         qml.StronglyEntanglingLayers(weights, wires=range(n_qubits))
@@ -36,5 +45,5 @@ def gqnn(n_layers, n_qubits, dev, interface='torch', diff_method='torch', fm_sty
 
     weight_shapes = {"weights": gqnn_shape(n_layers, n_qubits)}
     qlayer = qml.qnn.TorchLayer(circuit, weight_shapes)
-    
+
     return qlayer

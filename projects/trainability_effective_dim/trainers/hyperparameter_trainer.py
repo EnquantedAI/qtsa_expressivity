@@ -6,13 +6,15 @@ from pathlib import Path
 from torch.utils.data import DataLoader, TensorDataset
 from torch.optim import SGD, Adam
 from tqdm.notebook import tqdm
+import optuna
+import gc
 
 from trainers.abstract_trainer import AbstractTrainer
 
 torch.serialization.add_safe_globals([TensorDataset])
 
 
-class BasicTrainer(AbstractTrainer):
+class HyperparameterTrainer(AbstractTrainer):
     def __init__(
         self, training_path, validating_path, criterion, testing_path=None
     ) -> None:
@@ -23,12 +25,12 @@ class BasicTrainer(AbstractTrainer):
             criterion=criterion,
         )
 
-    def train_model(self, config, model_class):
+    def train_model(self, trial, config, model_class):
         training_config = config["training_config"]
         model_config = config["model_config"]
 
         dev = qml.device(model_config["sim"], wires=model_config["n_qubits"])
-
+        
         net = model_class(
             n_layers=model_config["n_layers"],
             n_qubits=model_config["n_qubits"],
@@ -63,7 +65,10 @@ class BasicTrainer(AbstractTrainer):
             pin_memory=False if training_config["device"] == "cpu" else True,
         )
 
-        training_metrics = {"training_loss": [], "validating_loss": []}
+        training_metrics = {
+            "training_loss": [],
+            "validating_loss": []
+        }
 
         for epoch in tqdm(range(training_config["epochs"]), desc="Epochs"):
             net.train()
@@ -73,9 +78,10 @@ class BasicTrainer(AbstractTrainer):
                 targets = targets.to(device).view(-1)
 
                 optimizer.zero_grad()
-
+                
                 outputs = net(inputs).view(-1)
 
+                
                 loss = self.criterion(outputs, targets)
 
                 if training_config["regularization"]["type"] == "l1":
@@ -84,7 +90,7 @@ class BasicTrainer(AbstractTrainer):
                         loss
                         + training_config["regularization"]["lambda"] * penality
                     )
-    
+
                 elif training_config["regularization"]["type"] == "l2":
                     penality = sum((p**2).sum() for p in net.parameters())
                     loss = (
@@ -100,7 +106,7 @@ class BasicTrainer(AbstractTrainer):
             net.eval()
             val_loss = 0.0
             val_steps = 0
-
+            
             for inputs, targets in valloader:
                 with torch.no_grad():
                     inputs = inputs.to(device).squeeze(0)
@@ -126,10 +132,19 @@ class BasicTrainer(AbstractTrainer):
 
                     val_loss += loss.item()
                     val_steps += 1
-
+                    
             training_metrics["training_loss"].append(loss)
             training_metrics["validating_loss"].append(val_loss)
 
+            trial.report(val_loss, epoch)
+            if trial.should_prune():
+                raise optuna.TrialPruned()
+
+            gc.collect()
+            
+        del trainloader
+        del valloader
+        
         return net, training_metrics
 
     def test_model(self, config, model_class):
