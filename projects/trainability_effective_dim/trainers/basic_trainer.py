@@ -68,6 +68,7 @@ class BasicTrainer(AbstractTrainer):
         for epoch in tqdm(range(training_config["epochs"]), desc="Epochs"):
             net.train()
             epoch_steps = 0
+            train_loss_sum = 0
             for inputs, targets in trainloader:
                 inputs = inputs.to(device).squeeze(0)
                 targets = targets.to(device).view(-1)
@@ -95,10 +96,11 @@ class BasicTrainer(AbstractTrainer):
                 loss.backward()
                 optimizer.step()
 
+                train_loss_sum += loss.item()
                 epoch_steps += 1
 
             net.eval()
-            val_loss = 0.0
+            val_loss_sum = 0.0
             val_steps = 0
 
             for inputs, targets in valloader:
@@ -124,11 +126,11 @@ class BasicTrainer(AbstractTrainer):
                             + training_config["regularization"]["lambda"] * penality
                         )
 
-                    val_loss += loss.item()
+                    val_loss_sum += loss.item()
                     val_steps += 1
 
-            training_metrics["training_loss"].append(loss)
-            training_metrics["validating_loss"].append(val_loss)
+            training_metrics["training_loss"].append(train_loss_sum / epoch_steps)
+            training_metrics["validating_loss"].append(val_loss_sum / val_steps)
 
         return net, training_metrics
 
