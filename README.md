@@ -49,6 +49,15 @@ The final deliverable will provide a predictive blueprint for identifying optima
   - Tools.py - some odd collection of utilities, including extras for PennyLane
   - Window.py - functions creating and managing sliding windows (making, splitting, etc.)
 
+### Specific examples
+- In examples/jacob/generalised_qnn_v1_0.ipynb
+  - Create a sample general QNN model (gqnn), determining its shape and drawing it
+  - Generate sample chaotic data (Mackey_Glass_tau_30 and NARMA10_Chaotic
+- In examples/jacob/generalised_qnn_v2_0.ipynb
+  - Train a GQNN model
+  - Show how to use parameters broadcasting (batching) 
+  - Adapt the model to use parameters broadcasting (src/models_batch.py)
+
 ### Requirements
 - Set up a virtual environment with **venv** or **anaconda** for Python 3.11 and activate it
 - Then install all software using **requirements.txt** file (available here):
