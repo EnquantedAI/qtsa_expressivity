@@ -1,20 +1,18 @@
+import pennylane as qml
 import torch
 from pennylane import numpy as np
-import pennylane as qml
-from sklearn.metrics import r2_score
-from pathlib import Path
+from torch.optim import Adam
 from torch.utils.data import DataLoader, TensorDataset
-from torch.optim import SGD, Adam
 from tqdm.notebook import tqdm
 
-from trainers.abstract_trainer import AbstractTrainer
+from .abstract_trainer import AbstractTrainer
 
 torch.serialization.add_safe_globals([TensorDataset])
 
 
 class BasicTrainer(AbstractTrainer):
     def __init__(
-        self, training_path, validating_path, criterion, testing_path=None
+            self, training_path, validating_path, criterion, testing_path=None
     ) -> None:
         super().__init__(
             training_path=training_path,
@@ -81,17 +79,11 @@ class BasicTrainer(AbstractTrainer):
 
                 if training_config["regularization"]["type"] == "l1":
                     penality = sum(p.abs().sum() for p in net.parameters())
-                    loss = (
-                        loss
-                        + training_config["regularization"]["lambda"] * penality
-                    )
-    
+                    loss = loss + training_config["regularization"]["lambda"] * penality
+
                 elif training_config["regularization"]["type"] == "l2":
-                    penality = sum((p**2).sum() for p in net.parameters())
-                    loss = (
-                        loss
-                        + training_config["regularization"]["lambda"] * penality
-                    )
+                    penality = sum((p ** 2).sum() for p in net.parameters())
+                    loss = loss + training_config["regularization"]["lambda"] * penality
 
                 loss.backward()
                 optimizer.step()
@@ -115,15 +107,15 @@ class BasicTrainer(AbstractTrainer):
                     if training_config["regularization"]["type"] == "l1":
                         penality = sum(p.abs().sum() for p in net.parameters())
                         loss = (
-                            loss
-                            + training_config["regularization"]["lambda"] * penality
+                                loss
+                                + training_config["regularization"]["lambda"] * penality
                         )
 
                     elif training_config["regularization"]["type"] == "l2":
-                        penality = sum((p**2).sum() for p in net.parameters())
+                        penality = sum((p ** 2).sum() for p in net.parameters())
                         loss = (
-                            loss
-                            + training_config["regularization"]["lambda"] * penality
+                                loss
+                                + training_config["regularization"]["lambda"] * penality
                         )
 
                     val_loss_sum += loss.item()
@@ -136,3 +128,62 @@ class BasicTrainer(AbstractTrainer):
 
     def test_model(self, config, model_class):
         pass
+
+    def test_simple_forecast(self, model_instance, data):
+        testloader = DataLoader(
+            self.valset,
+            batch_size=1,
+            shuffle=False,
+        )
+
+        forecasts = []
+        ground_truth = []
+        initial_data = None
+
+        for inputs, target in testloader:
+            with torch.no_grad():
+                pred = model_instance(inputs).view(-1)
+
+                if initial_data is None:
+                    initial_data = inputs.squeeze(0).cpu().numpy().copy()
+
+                forecasts.append(pred.cpu().numpy())
+                ground_truth.append(target.view(-1).cpu().numpy())
+
+        forecasts = np.concatenate(forecasts)
+        ground_truth = np.concatenate(ground_truth)
+
+        return initial_data, forecasts, ground_truth
+
+    def test_continuous_forecast(self, model_instance, data):
+        testloader = DataLoader(
+            self.valset,
+            batch_size=1,
+            shuffle=False,
+        )
+
+        forecasts = []
+        initial_data = []
+        ground_truth = []
+        rolling_input = None
+
+        for inputs, target in testloader:
+            with torch.no_grad():
+                if rolling_input is None:
+                    rolling_input = inputs
+                    initial_data = inputs.squeeze(0).cpu().numpy().copy()
+
+                pred = model_instance(rolling_input).view(-1)
+
+                rolling_input = torch.cat(
+                    (rolling_input[:, 1:], pred.unsqueeze(1)),
+                    dim=1,
+                )
+
+                forecasts.append(pred.cpu().numpy())
+                ground_truth.append(target.view(-1).cpu().numpy())
+
+        forecasts = np.concatenate(forecasts)
+        ground_truth = np.concatenate(ground_truth)
+
+        return initial_data, forecasts, ground_truth
