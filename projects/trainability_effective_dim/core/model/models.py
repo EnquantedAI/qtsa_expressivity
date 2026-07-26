@@ -1,7 +1,7 @@
 import os
 import sys
 
-project_root = os.path.abspath("../../..")
+project_root = os.path.abspath("../../../..")
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 print(f"Project root: {project_root}")
@@ -43,7 +43,10 @@ def gqnn(
 
         return [qml.expval(qml.PauliZ(m)) for m in meas]
 
+    # =======================================================================================================
+    # This fragment was added to the original src/models.py so that the qml model was compatible with PyTorch
     weight_shapes = {"weights": gqnn_shape(n_layers, n_qubits)}
     qlayer = qml.qnn.TorchLayer(circuit, weight_shapes)
+    # ========================================================================================================
 
     return qlayer

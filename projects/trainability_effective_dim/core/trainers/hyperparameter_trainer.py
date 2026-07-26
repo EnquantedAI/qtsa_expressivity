@@ -1,4 +1,6 @@
 import gc
+from os import PathLike
+from typing import Any, Callable, Mapping, Optional, Union
 
 import optuna
 import pennylane as qml
@@ -11,11 +13,34 @@ from .abstract_trainer import AbstractTrainer
 
 torch.serialization.add_safe_globals([TensorDataset])
 
+PathType = Union[str, PathLike[str]]
+Config = Mapping[str, Any]
+ModelFactory = Callable[..., torch.nn.Module]
+TrainingMetrics = dict[str, list[float]]
+
 
 class HyperparameterTrainer(AbstractTrainer):
+    """Train QNNs during an Optuna hyperparameter-optimization trial.
+
+    This trainer creates a model from a sampled configuration, records epoch-level
+    validation losses in Optuna, and prunes unpromising trials.
+    """
+
     def __init__(
-        self, training_path, validating_path, criterion, testing_path=None
+        self,
+        training_path: PathType,
+        validating_path: PathType,
+        criterion: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+        testing_path: Optional[PathType] = None,
     ) -> None:
+        """Initialize the trainer and load serialized datasets.
+
+        Args:
+            training_path: Path to the serialized training TensorDataset.
+            validating_path: Path to the serialized validation TensorDataset.
+            criterion: Loss function comparing predictions and target values.
+            testing_path: Optional path to the serialized testing TensorDataset.
+        """
         super().__init__(
             training_path=training_path,
             validating_path=validating_path,
@@ -23,7 +48,30 @@ class HyperparameterTrainer(AbstractTrainer):
             criterion=criterion,
         )
 
-    def train_model(self, trial, config, model_class):
+    def train_model(
+        self,
+        trial: optuna.trial.Trial,
+        config: Config,
+        model_class: ModelFactory,
+    ) -> tuple[torch.nn.Module, TrainingMetrics]:
+        """Train one model for an Optuna trial.
+
+        After every epoch, the method reports the validation loss to Optuna. It
+        raises ``optuna.TrialPruned`` when the configured pruning strategy stops
+        the current trial.
+
+        Args:
+            trial: Active Optuna trial used for metric reporting and pruning.
+            config: Nested dictionary containing training and model settings.
+            model_class: Callable that builds the QNN PyTorch module.
+
+        Returns:
+            A tuple containing the trained QNN and per-epoch training and
+            validation loss histories.
+
+        Raises:
+            optuna.TrialPruned: If Optuna determines the trial should stop early.
+        """
         training_config = config["training_config"]
         model_config = config["model_config"]
 
@@ -137,5 +185,18 @@ class HyperparameterTrainer(AbstractTrainer):
 
         return net, training_metrics
 
-    def test_model(self, config, model_class):
+    def test_model(
+        self,
+        config: Config,
+        model_class: ModelFactory,
+    ) -> None:
+        """Evaluate a model with a future testing implementation.
+
+        Args:
+            config: Configuration required for model construction or evaluation.
+            model_class: Callable that builds the QNN PyTorch module.
+
+        Returns:
+            None. The testing workflow is not yet implemented.
+        """
         pass
