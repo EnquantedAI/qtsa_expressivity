@@ -3,12 +3,16 @@ import pennylane as qml
 from pennylane import numpy as np
 from matplotlib import pyplot as plt
 from dataclasses import dataclass
+from typing import List, Tuple, Union, Callable, Any
 
 from projects.expr_train_theory.qfim.core import StateFunction
 
+
 @dataclass(frozen=True)
 class PennyLaneStateModel:
-    """State function and circuit metadata."""
+    """
+    State function and circuit metadata.
+    """
     state_function: StateFunction
     weight_shape: tuple[int, ...]
     parameter_count: int
@@ -18,18 +22,39 @@ class PennyLaneStateModel:
 
 
 class GQNN:
+    """
+    Generative Quantum Neural Network class encapsulating a PennyLane circuit
+    compatible with PyTorch and state vector simulation.
+    """
+
     def __init__(
-        self,
-        n_layers,
-        n_qubits,
-        quantum_device,
-        interface="torch",
-        diff_method="torch",
-        fm_style="zzfm",
-        meas=[0],
-    ):
+            self,
+            n_layers: int,
+            n_qubits: int,
+            quantum_device: qml.Device,
+            interface: str = "torch",
+            diff_method: str = "torch",
+            fm_style: str = "zzfm",
+            meas: List[int] = [0],
+    ) -> None:
+        """
+        Initialize the Generative Quantum Neural Network.
+
+        Args:
+            n_layers (int): Number of layers for the strongly entangling ansatz.
+            n_qubits (int): Number of qubits in the circuit.
+            quantum_device (qml.Device): PennyLane device used for quantum execution.
+            interface (str, optional): Autodifferentiation interface. Defaults to "torch".
+            diff_method (str, optional): Differentiation method. Defaults to "torch".
+            fm_style (str, optional): Feature map style ('zzfm', 'iqp', 'X', 'Y', 'Z'). Defaults to "zzfm".
+            meas (List[int], optional): List of qubit indices to measure. Defaults to [0].
+        """
         if n_layers <= 0:
             raise ValueError("n_layers must be a positive integer.")
+        if n_qubits <= 0:
+            raise ValueError("n_qubits must be a positive integer.")
+        if not isinstance(meas, (list, tuple)) or not all(isinstance(m, int) for m in meas):
+            raise TypeError("meas must be a list or tuple of integers.")
 
         self.n_layers = n_layers
         self.n_qubits = n_qubits
@@ -46,7 +71,7 @@ class GQNN:
         self.weight_shapes_torch_interface = {"weights": self.weight_shape}
         self.parameter_count = int(np.prod(self.weight_shape))
 
-        def ansatz(inputs, weights):
+        def ansatz(inputs: torch.Tensor, weights: torch.Tensor) -> None:
             wires = list(range(self.n_qubits))
 
             if self.fm_style == "iqp":
@@ -65,75 +90,99 @@ class GQNN:
             qml.StronglyEntanglingLayers(weights, wires=wires)
 
         @qml.qnode(quantum_device, interface=interface, diff_method=diff_method)
-        def circuit(inputs, weights):
+        def circuit(inputs: torch.Tensor, weights: torch.Tensor) -> List[torch.Tensor]:
             ansatz(inputs, weights)
             return [qml.expval(qml.PauliZ(m)) for m in self.meas]
 
         @qml.qnode(quantum_device, interface="torch", diff_method=diff_method)
-        def state_circuit(inputs, weights):
+        def state_circuit(inputs: torch.Tensor, weights: torch.Tensor) -> torch.Tensor:
             ansatz(inputs, weights)
             return qml.state()
 
-
         self.circuit = circuit
         self.state_circuit = state_circuit
-        self.qlayers = qml.qnn.TorchLayer(circuit, self.weight_shapes)
+        self.qlayers = qml.qnn.TorchLayer(circuit, self.weight_shapes_torch_interface)
 
-
-    ### Creates a ZZ feature map (Qiskit style)
     @staticmethod
-    def zz_feature_map(x, wires, repeats=1):
+    def zz_feature_map(
+            x: Union[torch.Tensor, np.ndarray, List[float]],
+            wires: List[int],
+            repeats: int = 1
+    ) -> None:
         """
-        Implements a second-order Havlíček ZZ feature map in PennyLane.
+        Implement a second-order Havlicek ZZ feature map in PennyLane.
 
-        Parameters:
-        -----------
-        x : array-like
-            The input classical data vector. Length must match the number of wires.
-        wires : list or iterable
-            The quantum wires/qubits to apply the feature map on.
-        repeats : int
-            Number of times to repeat the feature map layer (depth).
+        Args:
+            x (Union[torch.Tensor, np.ndarray, List[float]]): The input classical data vector.
+                Length must match the number of wires.
+            wires (List[int]): The quantum wires to apply the feature map on.
+            repeats (int, optional): Number of times to repeat the feature map layer. Defaults to 1.
         """
-        num_qubits = len(x)  # There could be more wires than data
+        if len(x) != len(wires):
+            raise ValueError(f"Length of inputs ({len(x)}) must match number of wires ({len(wires)}).")
+        if repeats <= 0:
+            raise ValueError("repeats must be a positive integer.")
+
+        num_qubits = len(x)
 
         for _ in range(repeats):
-            # 1. Uniform Superposition Layer
             for i in range(num_qubits):
                 qml.Hadamard(wires=wires[i])
 
-            # 2. First-Order Terms: Single-qubit Pauli-Z rotations
             for i in range(num_qubits):
-                # PennyLane Rz(theta) applies exp(-i * theta * Z / 2)
-                # To get exp(i * x_i * Z), we pass theta = -2 * x_i
                 qml.RZ(-2.0 * x[i], wires=wires[i])
 
-            # 3. Second-Order Terms: Pairwise ZZ interactions
             for i in range(num_qubits):
                 for j in range(i + 1, num_qubits):
-                    # Calculate the Havlíček coupling coefficient
                     phi_ij = (np.pi - x[i]) * (np.pi - x[j])
 
-                    # Implement exp(i * phi_ij * Z_i * Z_j) using CNOT-Rz-CNOT
                     qml.CNOT(wires=[wires[i], wires[j]])
                     qml.RZ(-2 * phi_ij, wires=wires[j])
                     qml.CNOT(wires=[wires[i], wires[j]])
 
-
-    ### Returns the shape of the model weights
     @staticmethod
-    def gqnn_shape(n_layers, n_qubits):
+    def gqnn_shape(n_layers: int, n_qubits: int) -> Tuple[int, int, int]:
+        """
+        Return the shape of the model weights for strongly entangling layers.
+
+        Args:
+            n_layers (int): Number of circuit layers.
+            n_qubits (int): Number of qubits.
+
+        Returns:
+            Tuple[int, int, int]: The shape tuple for the weight tensor.
+        """
+        if n_layers <= 0 or n_qubits <= 0:
+            raise ValueError("n_layers and n_qubits must be positive integers.")
+
         shape = qml.StronglyEntanglingLayers.shape(n_layers=n_layers, n_wires=n_qubits)
         return shape
 
-    ### Draw this circuit beautifully as in Qiskit
-    #   Lots of styles apply, e.g. 'black_white', 'black_white_dark', 'sketch',
-    #     'pennylane', 'pennylane_sketch', 'sketch_dark', 'solarized_light', 'solarized_dark',
-    #     'default', we can even use 'rcParams' to redefine all attributes
-    #   level = None, 'user', 'top', 'device', 'gradient', 0, 1, ...
-    def draw_circuit(self, fontsize=20, style='pennylane',
-                     scale=None, title=None, decimals=2, level='user'):
-        def _draw_circuit(*args, **kwargs):
+    def draw_circuit(
+            self,
+            fontsize: int = 20,
+            style: str = 'pennylane',
+            scale: Union[float, None] = None,
+            title: Union[str, None] = None,
+            decimals: int = 2,
+            level: Union[str, int] = 'user'
+    ) -> Callable:
+        """
+        Create a callable function that renders the circuit architecture using matplotlib.
+
+        Args:
+            fontsize (int, optional): Font size for the plot title. Defaults to 20.
+            style (str, optional): PennyLane drawer style. Defaults to 'pennylane'.
+            scale (float, optional): Scaling factor for the figure resolution. Defaults to None.
+            title (str, optional): Plot title. Defaults to None.
+            decimals (int, optional): Number of decimal places for parameter display. Defaults to 2.
+            level (Union[str, int], optional): PennyLane drawer level. Defaults to 'user'.
+
+        Returns:
+            Callable: A function executing the drawing process.
+        """
+
+        def _draw_circuit(*args: Any, **kwargs: Any) -> None:
             nonlocal fontsize, style, scale, title, level
             qml.drawer.use_style(style)
             fig, ax = qml.draw_mpl(self.circuit, decimals=decimals, level=level)(*args, **kwargs)
@@ -146,7 +195,26 @@ class GQNN:
 
         return _draw_circuit
 
-    def state_function(self, inputs, flat_parameters):
+    def state_function(
+            self,
+            inputs: Union[torch.Tensor, np.ndarray, List[float]],
+            flat_parameters: Union[torch.Tensor, np.ndarray, List[float]]
+    ) -> torch.Tensor:
+        """
+        Compute the analytical state vector of the circuit.
+
+        Args:
+            inputs (Union[torch.Tensor, np.ndarray, List[float]]): Classical data inputs.
+            flat_parameters (Union[torch.Tensor, np.ndarray, List[float]]): 1D array of variational weights.
+
+        Returns:
+            torch.Tensor: The complex state vector produced by the circuit.
+        """
+        if not isinstance(inputs, (torch.Tensor, np.ndarray, list)):
+            raise TypeError("inputs must be a torch.Tensor, numpy.ndarray, or list.")
+        if not isinstance(flat_parameters, (torch.Tensor, np.ndarray, list)):
+            raise TypeError("flat_parameters must be a torch.Tensor, numpy.ndarray, or list.")
+
         inputs = torch.as_tensor(
             inputs,
             dtype=torch.float64,
