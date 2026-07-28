@@ -22,8 +22,8 @@ class AbstractTrainer(ABC):
         self,
         training_path: PathType,
         validating_path: PathType,
+        testing_path: PathType,
         criterion: Callable[..., torch.Tensor],
-        testing_path: Optional[PathType] = None,
     ) -> None:
         """Load training, validation, and optionally test datasets.
 
@@ -35,13 +35,12 @@ class AbstractTrainer(ABC):
         """
         self.trainset = torch.load(training_path)
         self.valset = torch.load(validating_path)
-        if testing_path:
-            self.testset = torch.load(testing_path)
+        self.testset = torch.load(testing_path)
 
         self.criterion = criterion
 
     @abstractmethod
-    def train_model(self, config: dict[str, Any], model: torch.nn.Module) -> Any:
+    def train_model(self, config: dict[str, Any], model: Any) -> Any:
         """Train a model using a supplied training configuration.
 
         Args:
@@ -55,7 +54,7 @@ class AbstractTrainer(ABC):
         pass
 
     @abstractmethod
-    def test_model(self, model: torch.nn.Module) -> Any:
+    def test_model(self, model: Any) -> Any:
         """Evaluate a trained model on the configured evaluation dataset.
 
         Args:
