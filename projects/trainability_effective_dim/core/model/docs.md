@@ -1,13 +1,13 @@
 # GQNN
 
-`GQNN` is a PennyLane quantum neural network wrapper designed for PyTorch training and quantum-state analysis.
+`GQNN` is a PennyLane quantum neural network wrapper designed for PyTorch training and quantum state analysis.
 
 It creates one shared variational circuit with two outputs:
 
-- `gqnn.qlayers(inputs)` returns Pauli-Z expectation values for training.
-- `gqnn.state_circuit(inputs, weights)` returns the complete statevector for analysis, including QFIM calculations.
+*   `gqnn.qlayers(inputs)` returns Pauli-Z expectation values for training.
+*   `gqnn.state_circuit(inputs, weights)` returns the complete statevector for analysis.
 
-The trainable circuit uses PennyLane’s `StronglyEntanglingLayers`; its weight tensor has shape:
+The trainable circuit uses PennyLane's `StronglyEntanglingLayers`. Its weight tensor has shape:
 
 ```python
 (n_layers, n_qubits, 3)
@@ -19,7 +19,7 @@ For an input vector `inputs`, the circuit performs:
 
 1. Data embedding through a feature map.
 2. A trainable `StronglyEntanglingLayers` ansatz.
-3. Either Pauli-Z expectation-value measurements or a full statevector measurement.
+3. Either Pauli-Z expectation value measurements or a full statevector measurement.
 
 The available feature maps are:
 
@@ -55,7 +55,7 @@ gqnn = GQNN(
 )
 ```
 
-`quantum_device` selects the PennyLane backend. It can be a simulator such as `"default.qubit"` or a supported quantum-hardware backend.
+`quantum_device` selects the PennyLane backend. It can be a simulator such as `"default.qubit"` or a supported quantum hardware backend.
 
 ## Important attributes
 
@@ -70,7 +70,7 @@ gqnn.state_circuit
 gqnn.qlayers
 ```
 
-`gqnn.qlayers` is the PyTorch-compatible quantum layer. Its trainable parameters are stored in:
+`gqnn.qlayers` is the PyTorch compatible quantum layer. Its trainable parameters are stored in:
 
 ```python
 gqnn.qlayers.weights
@@ -168,7 +168,7 @@ state = gqnn.state_circuit(
 print(state.shape)
 ```
 
-For `n_qubits`, the statevector contains $2^{\text{n_qubits}}$ complex amplitudes.
+For `n_qubits`, the statevector contains $2^{\text{n\_qubits}}$ complex amplitudes.
 
 ```python
 print(state)
@@ -176,48 +176,36 @@ print(state)
 
 ## QFIM state function
 
-`state_function` evaluates the statevector for an explicit parameter vector.
+The `state_function` method prepares a callable compatible with NumPy based QFIM routines.
 
 ```python
-state = gqnn.state_function(
-    inputs=inputs,
-    flat_parameters=gqnn.qlayers.weights,
-)
+state_model = gqnn.state_function(inputs)
 ```
 
-The supplied parameters are flattened internally, validated, reshaped to `gqnn.weight_shape`, and passed to `state_circuit`.
-
-The term `flat_parameters` means a one-dimensional representation of every trainable circuit parameter:
+It returns a `PennyLaneStateModel` dataclass. The `.state_function` attribute of this dataclass is a callable that accepts a flattened parameter array and returns the evaluated statevector.
 
 ```python
-flat_parameters = gqnn.qlayers.weights.reshape(-1)
+flat_parameters = gqnn.qlayers.weights.detach().cpu().numpy().reshape(-1)
+state_vector = state_model.state_function(flat_parameters)
 ```
 
-It contains only ansatz weights. It does not contain feature-map inputs.
-
-```python
-state = gqnn.state_function(
-    inputs=inputs,
-    flat_parameters=flat_parameters,
-)
-```
-
-This explicit-parameter interface is useful for QFIM code because it can evaluate the state at arbitrary parameter values near the trained point.
+This explicit parameter interface evaluates the state at arbitrary parameter values near the trained point. The array must contain only ansatz weights, not feature map inputs.
 
 ## Trained QFIM point
 
-To evaluate a QFIM at the learned parameters:
+To evaluate the Quantum Fisher Information Matrix using finite differences at the learned parameters, detach the weights and convert them to NumPy.
 
 ```python
-trained_parameters = gqnn.qlayers.weights
+trained_weights_np = gqnn.qlayers.weights.detach().cpu().numpy().reshape(-1)
+state_model = gqnn.state_function(inputs)
 
-state = gqnn.state_function(
-    inputs=inputs,
-    flat_parameters=trained_parameters,
+qfim = compute_pure_state_qfim(
+    state_function=state_model.state_function,
+    parameters=trained_weights_np,
 )
 ```
 
-Do not use `.detach()`, `.numpy()`, or `pennylane.numpy.asarray()` if the QFIM implementation differentiates through `flat_parameters`. Those conversions can disconnect the computation from PyTorch autograd.
+Because the QFIM utility relies on NumPy and finite differences, converting PyTorch tensors to detached NumPy arrays is strictly required to prevent type conflicts and computation graph errors.
 
 ## Drawing the circuit
 

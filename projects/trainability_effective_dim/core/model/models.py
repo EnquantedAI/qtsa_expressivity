@@ -23,7 +23,7 @@ class PennyLaneStateModel:
 
 class GQNN:
     """
-    Generative Quantum Neural Network class encapsulating a PennyLane circuit
+    Generalized Quantum Neural Network class encapsulating a PennyLane circuit
     compatible with PyTorch and state vector simulation.
     """
 
@@ -31,14 +31,14 @@ class GQNN:
             self,
             n_layers: int,
             n_qubits: int,
-            quantum_device: qml.Device,
+            quantum_device: qml.devices,
             interface: str = "torch",
             diff_method: str = "torch",
             fm_style: str = "zzfm",
             meas: List[int] = [0],
     ) -> None:
         """
-        Initialize the Generative Quantum Neural Network.
+        Initialize the Generalized Quantum Neural Network.
 
         Args:
             n_layers (int): Number of layers for the strongly entangling ansatz.
@@ -101,6 +101,14 @@ class GQNN:
 
         self.circuit = circuit
         self.state_circuit = state_circuit
+        self.PennyLaneStateModel =  PennyLaneStateModel(
+            state_function=self.state_function,
+            weight_shape=self.weight_shape,
+            parameter_count=self.parameter_count,
+            n_qubits=self.n_qubits,
+            n_layers=self.n_layers,
+            feature_map=self.fm_style,
+        )
         self.qlayers = qml.qnn.TorchLayer(circuit, self.weight_shapes_torch_interface)
 
     @staticmethod
@@ -198,40 +206,41 @@ class GQNN:
     def state_function(
             self,
             inputs: Union[torch.Tensor, np.ndarray, List[float]],
-            flat_parameters: Union[torch.Tensor, np.ndarray, List[float]]
-    ) -> torch.Tensor:
+    ) -> PennyLaneStateModel:
         """
-        Compute the analytical state vector of the circuit.
-
-        Args:
-            inputs (Union[torch.Tensor, np.ndarray, List[float]]): Classical data inputs.
-            flat_parameters (Union[torch.Tensor, np.ndarray, List[float]]): 1D array of variational weights.
-
-        Returns:
-            torch.Tensor: The complex state vector produced by the circuit.
+        Create a NumPy-compatible state function for QFIM evaluation.
         """
-        if not isinstance(inputs, (torch.Tensor, np.ndarray, list)):
-            raise TypeError("inputs must be a torch.Tensor, numpy.ndarray, or list.")
-        if not isinstance(flat_parameters, (torch.Tensor, np.ndarray, list)):
-            raise TypeError("flat_parameters must be a torch.Tensor, numpy.ndarray, or list.")
+        if isinstance(inputs, torch.Tensor):
+            fixed_inputs = inputs.detach().cpu().numpy()
+        else:
+            fixed_inputs = np.asarray(inputs, dtype=float)
 
-        inputs = torch.as_tensor(
-            inputs,
-            dtype=torch.float64,
-            device=self.qlayers.weights.device,
+        fixed_inputs = fixed_inputs.reshape(-1)
+
+        if fixed_inputs.size != self.n_qubits:
+            raise ValueError(f"Expected {self.n_qubits} input features, received {fixed_inputs.size}.")
+        if not np.all(np.isfinite(fixed_inputs)):
+            raise ValueError("inputs must contain only finite values.")
+
+        def evaluate_state(flat_parameters: np.ndarray) -> np.ndarray:
+            theta = np.asarray(flat_parameters, dtype=float).reshape(-1)
+
+            if theta.size != self.parameter_count:
+                raise ValueError(
+                    f"Expected {self.parameter_count} parameters, "
+                    f"received {theta.size}."
+                )
+
+            weights = theta.reshape(self.weight_shape)
+            state = self.state_circuit(fixed_inputs, weights)
+
+            return np.asarray(state, dtype=np.complex128).reshape(-1)
+
+        return PennyLaneStateModel(
+            state_function=evaluate_state,
+            weight_shape=self.weight_shape,
+            parameter_count=self.parameter_count,
+            n_qubits=self.n_qubits,
+            n_layers=self.n_layers,
+            feature_map=self.fm_style,
         )
-
-        theta = torch.as_tensor(
-            flat_parameters,
-            dtype=self.qlayers.weights.dtype,
-            device=self.qlayers.weights.device,
-        ).reshape(-1)
-
-        if theta.numel() != self.parameter_count:
-            raise ValueError(
-                f"Expected {self.parameter_count} parameters, "
-                f"received {theta.numel()}."
-            )
-
-        weights = theta.reshape(self.weight_shape)
-        return self.state_circuit(inputs, weights)
