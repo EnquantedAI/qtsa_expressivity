@@ -2,11 +2,11 @@ from pennylane import numpy as np
 import torch
 from .cfim import cfim_for_input
 
-def sample_empirical_fisher(
+def sample_empirical_fishers(
     net,
     parameter_space,
     inputs,
-    n_theta=10,
+    n_theta=100,
     min_probability=1e-12,
 ):
     if inputs.ndim == 1:
