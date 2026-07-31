@@ -24,6 +24,18 @@ class DummyNet:
 
 class TestGlobalEffectiveDimension(unittest.TestCase):
     def test_one_dimensional_constant_fisher_has_known_ged(self):
+        """
+        Verify GED against its analytic value for a constant one-dimensional
+        empirical Fisher matrix.
+
+        Every sampled parameter vector has Fisher matrix [[2]]. Because the
+        mean Fisher trace is also 2 and d = 1, every normalized Fisher matrix
+        is F_hat = [[1]]. The Monte Carlo average is therefore exact.
+
+        Expected result:
+            - GED equals log(1 + kappa) / log(kappa).
+            - The result contains exactly one effective-dimension value.
+        """
         net = DummyNet(parameter_count=1)
         fishers = torch.tensor(
             [
@@ -33,6 +45,7 @@ class TestGlobalEffectiveDimension(unittest.TestCase):
             ],
             dtype=torch.float64,
         )
+
         n = 100
         kappa = n / (2.0 * math.pi * math.log(n))
         expected = math.log1p(kappa) / math.log(kappa)
@@ -53,6 +66,20 @@ class TestGlobalEffectiveDimension(unittest.TestCase):
         self.assertAlmostEqual(actual[0], expected, places=12)
 
     def test_ged_uses_each_parameter_sample_before_averaging(self):
+        """
+        Verify that GED computes the determinant contribution separately for
+        every sampled parameter vector before the final Monte Carlo average.
+
+        The supplied Fisher matrices are [[1]] and [[3]]. Their mean trace is
+        2, giving normalized values [[0.5]] and [[1.5]]. GED must average
+        sqrt(1 + kappa * F_hat) over these two samples, rather than calculate
+        the determinant after prematurely averaging the Fisher matrices.
+
+        Expected result:
+            - GED equals the explicit two-sample Monte Carlo expression.
+            - The test fails if Fisher matrices are averaged before their
+              individual log-determinants are computed.
+        """
         net = DummyNet(parameter_count=1)
         fishers = torch.tensor(
             [
@@ -61,6 +88,7 @@ class TestGlobalEffectiveDimension(unittest.TestCase):
             ],
             dtype=torch.float64,
         )
+
         n = 100
         kappa = n / (2.0 * math.pi * math.log(n))
 
@@ -95,6 +123,18 @@ class TestGlobalEffectiveDimension(unittest.TestCase):
         self.assertAlmostEqual(actual[0], expected, places=12)
 
     def test_ged_is_invariant_under_global_fisher_scaling(self):
+        """
+        Verify invariance of LED under multiplication of all Fisher matrices
+        by the same positive scalar.
+
+        LED normalizes each Fisher matrix using the trace of the mean Fisher
+        matrix. Therefore, multiplying every Fisher matrix by 12 multiplies
+        numerator and normalization trace equally, leaving F_hat unchanged.
+
+        Expected result:
+            - LED from `fishers` equals LED from `12 * fishers`.
+            - This validates the Fisher-trace normalization.
+        """
         net = DummyNet(parameter_count=2)
 
         fishers = torch.tensor(
@@ -139,6 +179,18 @@ class TestGlobalEffectiveDimension(unittest.TestCase):
         )
 
     def test_returns_one_value_per_theoretical_dataset_size(self):
+        """
+        Verify that GED returns one finite value for every requested
+        theoretical dataset size.
+
+        For constant one-dimensional Fisher matrices, the normalized Fisher
+        is [[1]] for every parameter sample. Dataset sizes are selected such
+        that kappa > 1, avoiding the invalid negative-log-kappa regime.
+
+        Expected result:
+            - The returned list has the same length as `sample_sizes`.
+            - Each GED value is finite.
+        """
         net = DummyNet(parameter_count=1)
         fishers = torch.tensor(
             [
@@ -148,7 +200,7 @@ class TestGlobalEffectiveDimension(unittest.TestCase):
             dtype=torch.float64,
         )
 
-        sample_sizes = [10, 100, 1_000]
+        sample_sizes = [100, 1_000, 10_000]
 
         with patch(
             "projects.trainability_effective_dim.core.measures.ged."
@@ -166,6 +218,15 @@ class TestGlobalEffectiveDimension(unittest.TestCase):
         self.assertTrue(all(math.isfinite(value) for value in actual))
 
     def test_rejects_dataset_size_at_most_one(self):
+        """
+        Verify that GED rejects an invalid theoretical dataset size.
+
+        GED uses log(n) to define kappa. This is undefined for n = 1, so the
+        estimator must raise ValueError before attempting the calculation.
+
+        Expected result:
+            - Calling GED with n = 1 raises ValueError.
+        """
         net = DummyNet(parameter_count=1)
         fishers = torch.tensor([[[1.0]]], dtype=torch.float64)
 

@@ -21,6 +21,19 @@ class TestNet:
 
 class TestCFIM(unittest.TestCase):
     def test_single_ry_has_unit_fisher_information(self):
+        """
+        Verify the CFIM for a single parameterized RY rotation.
+
+        The circuit prepares RY(theta)|0>, with computational-basis
+        probabilities cos²(theta/2) and sin²(theta/2). Its classical Fisher
+        information with respect to theta is analytically equal to [[1]].
+
+        Expected result:
+            - CFIM has shape (1, 1).
+            - CFIM equals [[1.0]].
+            - Returned probabilities equal
+              [cos²(theta/2), sin²(theta/2)].
+        """
         dev = qml.device("default.qubit", wires=1)
 
         @qml.qnode(dev, interface="torch", diff_method="backprop")
@@ -52,6 +65,20 @@ class TestCFIM(unittest.TestCase):
         )
 
     def test_shared_angle_has_rank_one_fisher_matrix(self):
+        """
+        Verify the CFIM when two parameters affect the circuit identically.
+
+        The circuit depends only on theta_0 + theta_1. Therefore, changing
+        either parameter produces the same change in the output distribution.
+        The two parameters are fully correlated and only one parameter
+        direction is identifiable.
+
+        Expected result:
+            - CFIM equals [[1, 1], [1, 1]].
+            - CFIM has rank one.
+            - The parameter direction theta_0 - theta_1 has zero Fisher
+              information.
+        """
         dev = qml.device("default.qubit", wires=1)
 
         @qml.qnode(dev, interface="torch", diff_method="backprop")
@@ -77,6 +104,19 @@ class TestCFIM(unittest.TestCase):
         torch.testing.assert_close(actual, expected, atol=1e-10, rtol=1e-10)
 
     def test_independent_rotations_have_identity_fisher_matrix(self):
+        """
+        Verify the CFIM for two independent single-qubit RY rotations.
+
+        Each parameter controls an RY rotation on a separate qubit. Hence,
+        each parameter independently affects the computational-basis
+        probability distribution and introduces no cross-parameter
+        correlation.
+
+        Expected result:
+            - CFIM equals the 2 x 2 identity matrix.
+            - Each parameter has Fisher information equal to one.
+            - Off-diagonal entries are zero.
+        """
         dev = qml.device("default.qubit", wires=2)
 
         @qml.qnode(dev, interface="torch", diff_method="backprop")
@@ -100,6 +140,19 @@ class TestCFIM(unittest.TestCase):
         torch.testing.assert_close(actual, expected, atol=1e-10, rtol=1e-10)
 
     def test_cancelling_rotations_have_zero_fisher_information(self):
+        """
+        Verify that an unidentifiable parameter produces a zero CFIM.
+
+        The circuit applies RY(theta) followed by RY(-theta), which exactly
+        cancel. The final state is always |0>, independently of theta.
+        Therefore, the output probabilities have zero derivatives with
+        respect to theta.
+
+        Expected result:
+            - CFIM equals [[0.0]].
+            - The parameter has no effect on measurement probabilities.
+            - The parameter is unidentifiable from this circuit's output.
+        """
         dev = qml.device("default.qubit", wires=1)
 
         @qml.qnode(dev, interface="torch", diff_method="backprop")

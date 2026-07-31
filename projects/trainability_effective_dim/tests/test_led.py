@@ -24,6 +24,20 @@ class DummyNet:
 
 class TestLocalEffectiveDimension(unittest.TestCase):
     def test_constant_one_dimensional_fisher_has_known_led(self):
+        """
+        Verify LED against its analytic value for a constant one-dimensional
+        empirical Fisher matrix.
+
+        Each sampled parameter point has Fisher matrix [[2]]. Since the mean
+        Fisher trace is also 2 and d = 1, the normalized Fisher matrix is
+        F_hat = [[1]] for every parameter sample. The Monte Carlo average is
+        therefore exact.
+
+        Expected result:
+            - LED equals log(1 + kappa) / log(kappa).
+            - The returned result contains exactly one value.
+            - The epsilon value does not affect this mocked Fisher input.
+        """
         net = DummyNet(parameter_count=1)
         fishers = torch.tensor(
             [
@@ -55,6 +69,20 @@ class TestLocalEffectiveDimension(unittest.TestCase):
         self.assertAlmostEqual(actual[0], expected, places=12)
 
     def test_led_uses_each_parameter_sample_before_averaging(self):
+        """
+        Verify that LED evaluates the log-determinant separately for every
+        sampled parameter vector before performing the Monte Carlo average.
+
+        The two Fisher matrices are [[1]] and [[3]]. Their mean trace is 2,
+        so the normalized matrices are [[0.5]] and [[1.5]]. LED must average
+        sqrt(1 + kappa * F_hat) values, not compute the determinant from a
+        Fisher matrix averaged before this nonlinear operation.
+
+        Expected result:
+            - LED equals the explicit two-sample Monte Carlo expression.
+            - The test fails if Fisher matrices are averaged before computing
+              individual log-determinants.
+        """
         net = DummyNet(parameter_count=1)
         fishers = torch.tensor(
             [
@@ -95,6 +123,18 @@ class TestLocalEffectiveDimension(unittest.TestCase):
         self.assertAlmostEqual(actual[0], expected, places=12)
 
     def test_led_is_invariant_under_global_fisher_scaling(self):
+        """
+        Verify invariance of LED under multiplication of all Fisher matrices
+        by the same positive scalar.
+
+        LED normalizes each Fisher matrix using the trace of the mean Fisher
+        matrix. Therefore, multiplying every Fisher matrix by 12 multiplies
+        numerator and normalization trace equally, leaving F_hat unchanged.
+
+        Expected result:
+            - LED from `fishers` equals LED from `12 * fishers`.
+            - This validates the Fisher-trace normalization.
+        """
         net = DummyNet(parameter_count=2)
 
         fishers = torch.tensor(
@@ -136,6 +176,18 @@ class TestLocalEffectiveDimension(unittest.TestCase):
         )
 
     def test_passes_epsilon_ball_sampler_to_monte_carlo(self):
+        """
+        Verify that LED constructs and passes an epsilon-ball parameter-space
+        sampler to the empirical-Fisher Monte Carlo estimator.
+
+        LED is local because it samples parameter values near the current
+        model weights, rather than sampling from a global parameter domain.
+
+        Expected result:
+            - The Monte Carlo estimator receives an EpsilonBallParameterSpace.
+            - The sampler epsilon equals the epsilon supplied to LED.
+            - The sampler centre equals the network's current weights.
+        """
         net = DummyNet(parameter_count=2)
         fishers = torch.tensor(
             [
@@ -172,6 +224,15 @@ class TestLocalEffectiveDimension(unittest.TestCase):
         )
 
     def test_rejects_dataset_size_at_most_one(self):
+        """
+        Verify rejection of an invalid theoretical dataset size.
+
+        The LED normalization uses log(n), which is undefined at n = 1 and
+        inappropriate for n below or equal to one.
+
+        Expected result:
+            - Calling LED with n = 1 raises ValueError.
+        """
         net = DummyNet(parameter_count=1)
         fishers = torch.tensor([[[1.0]]], dtype=torch.float64)
 
