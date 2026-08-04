@@ -16,7 +16,7 @@ class DenseOperator(SymmetricOperator):
         self,
         matrix: np.ndarray,
     ):
-        matrix = np.asarray(matrix)
+        self.matrix = np.asarray(matrix)
 
         if matrix.ndim != 2:
             raise ValueError("matrix must be two-dimensional")
@@ -24,22 +24,15 @@ class DenseOperator(SymmetricOperator):
         if matrix.shape[0] != matrix.shape[1]:
             raise ValueError("matrix must be square")
 
-        if check_symmetry:
-            if not np.allclose(matrix, matrix.T):
-                raise ValueError("matrix must be symmetric")
+        if not np.allclose(matrix, matrix.T):
+            raise ValueError("matrix must be symmetric")
 
-        self._matrix = matrix
+        super().__init__(self.matrix.shape)
 
-    @property
-    def shape(self):
-        return self._matrix.shape
 
-    @property
-    def matrix(self):
-        return self._matrix
+    def _matvec(self, x):
+        return self.matrix @ x
 
-    def matvec(
-        self,
-        x: np.ndarray,
-    ) -> np.ndarray:
-        return self._matrix @ x
+
+    def __matmul__(self, x):
+        return self.matrix @ x

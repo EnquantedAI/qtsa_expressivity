@@ -5,7 +5,7 @@ from scipy.sparse.linalg import LinearOperator
 
 import numpy as np
 
-class SymmetricOperator(LinearOperator):
+class SymmetricOperator(LinearOperator, ABC):
     """
     Abstract symmetric linear operator. Symmetry is required by Krylov methods.
     
@@ -16,22 +16,15 @@ class SymmetricOperator(LinearOperator):
     (e.g. of the quantum Neural Tangent Kernel)
     """
 
-    def __init__(self, dtype=np.float64):
-        super().__init__(dtype=dtype, shape=self.shape)
+    def __init__(self, shape):
+        super().__init__(dtype=np.dtype(np.float64), shape=shape)
 
-    @property
-    @abstractmethod
-    def shape(self) -> tuple[int, int]:
-        """Shape of the operator (N, N)."""
-        pass
 
     @abstractmethod
-    def matvec(self, x: np.ndarray) -> np.ndarray:
-        """Compute y = A x."""
-        pass
-
     def _matvec(self, x: np.ndarray) -> np.ndarray:
         return self.matvec(x)
 
+
+    @abstractmethod
     def __matmul__(self, x: np.ndarray) -> np.ndarray:
         return self.matvec(x)
