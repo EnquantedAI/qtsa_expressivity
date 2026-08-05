@@ -1,3 +1,5 @@
+from .symmetric_operator import SymmetricOperator
+
 class QNTKOperator(SymmetricOperator):
 
     def __init__(self, oracle):
@@ -11,3 +13,6 @@ class QNTKOperator(SymmetricOperator):
         return self.oracle.jvp(
             self.oracle.vjp(x)
         )
+
+    def __matmul__(self, x):
+        return 

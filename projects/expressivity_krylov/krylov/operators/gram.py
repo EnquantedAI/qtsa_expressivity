@@ -1,3 +1,5 @@
+from .symmetric_operator import SymmetricOperator
+
 class GramOperator(SymmetricOperator):
 
     def __init__(self, oracle):
@@ -11,3 +13,6 @@ class GramOperator(SymmetricOperator):
         return self.oracle.vjp(
             self.oracle.jvp(x)
         )
+
+    def __matmul__(self, x):
+        return 

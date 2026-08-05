@@ -23,7 +23,7 @@ def smallest_eigenvalue(
     value = eigsh(
         operator,
         k=1,
-        sigma=0.0,
+        sigma=1e-3,
         which="LM",
         mode="normal",
         return_eigenvectors=False,

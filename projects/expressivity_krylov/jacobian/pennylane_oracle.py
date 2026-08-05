@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import numpy as np
 import pennylane as qml
+from pennylane import numpy as np
 
 from .oracle import JacobianOracle
 

@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 
 from scipy.sparse.linalg import LinearOperator
 
-import numpy as np
+from pennylane import numpy as np
 
 class SymmetricOperator(LinearOperator, ABC):
     """
@@ -22,9 +22,4 @@ class SymmetricOperator(LinearOperator, ABC):
 
     @abstractmethod
     def _matvec(self, x: np.ndarray) -> np.ndarray:
-        return self.matvec(x)
-
-
-    @abstractmethod
-    def __matmul__(self, x: np.ndarray) -> np.ndarray:
         return self.matvec(x)

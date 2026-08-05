@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import numpy as np
+from pennylane import numpy as np
 
 from .symmetric_operator import SymmetricOperator
 
@@ -31,8 +31,4 @@ class DenseOperator(SymmetricOperator):
 
 
     def _matvec(self, x):
-        return self.matrix @ x
-
-
-    def __matmul__(self, x):
         return self.matrix @ x
