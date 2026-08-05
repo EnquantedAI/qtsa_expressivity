@@ -25,10 +25,10 @@ class PennyLaneStateModel:
 def _require_pennylane():
     try:
         import pennylane as qml
-    except ModuleNotFoundError as exc:  # pragma: no cover - environment dependent
+    except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
             "PennyLane is required for the PennyLane QFIM adapter. "
-            "Install the project environment with `pip install -r requirements.txt`."
+            "Install the project dependencies with `pip install -r requirements.txt`."
         ) from exc
     return qml
 

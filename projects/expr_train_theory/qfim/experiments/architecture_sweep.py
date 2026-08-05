@@ -1,6 +1,6 @@
 """Controlled QFIM sweep over circuit width and depth.
 
-The experiment is intentionally small and diagnostic.  It varies only the
+This is a small diagnostic sweep. It varies only the
 number of qubits and variational layers while holding the feature-map family,
 parameter initialization and numerical QFIM convention fixed.
 """

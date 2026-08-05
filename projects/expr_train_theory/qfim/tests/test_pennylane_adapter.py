@@ -15,7 +15,7 @@ from projects.expr_train_theory.qfim.core import (
 PENNYLANE_AVAILABLE = importlib.util.find_spec("pennylane") is not None
 
 
-@unittest.skipUnless(PENNYLANE_AVAILABLE, "PennyLane is not installed")
+@unittest.skipUnless(PENNYLANE_AVAILABLE, "PennyLane is required for these tests")
 class PennyLaneAdapterTests(unittest.TestCase):
     def test_shared_architecture_returns_normalized_state_and_square_qfim(self):
         from projects.expr_train_theory.qfim.pennylane_adapter import (

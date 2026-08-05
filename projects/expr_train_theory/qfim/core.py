@@ -37,7 +37,7 @@ def _as_normalized_state(state: np.ndarray, *, normalization_tolerance: float) -
     if abs(norm - 1.0) > normalization_tolerance:
         raise ValueError(
             f"Expected a normalized state, but its norm is {norm:.12g}. "
-            "Normalize the state in the model or increase normalization_tolerance deliberately."
+            "Normalize the state in the model or adjust normalization_tolerance."
         )
     return vector / norm
 
