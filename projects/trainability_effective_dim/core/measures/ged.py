@@ -8,6 +8,7 @@ from .samplers import UniformParameterSpace
 def estimate_global_effective_dimension(
     net,
     inputs,
+    normalize=False,
     n_theta=100,
     min_probability=1e-12,
     array_of_theoretical_number_of_data_samples=None,
@@ -55,6 +56,12 @@ def estimate_global_effective_dimension(
             tensor. The expected shape is typically
             `(number_of_inputs, input_dimension)`.
 
+        normalize:
+            If `True`, divide every GED estimate by the model parameter count
+            `d`, returning a dimensionless value relative to the number of
+            trainable parameters. If `False`, return the standard GED estimate
+            in effective-dimension units. Default: False.
+
         n_theta:
             Number of parameter tensors sampled from the global uniform
             parameter space. Default: 100.
@@ -71,6 +78,12 @@ def estimate_global_effective_dimension(
         list[float]:
             One GED estimate per requested theoretical dataset size, in the
             same order as `array_of_theoretical_number_of_data_samples`.
+
+            If `normalize=False`, each value is the standard GED estimate.
+
+            If `normalize=True`, each value is divided by `d`, the number of
+            trainable parameters
+
 
     Raises:
         ValueError:
@@ -90,6 +103,10 @@ def estimate_global_effective_dimension(
         - `sample_empirical_fishers` must return shape `(n_theta, d, d)`;
           its leading dimension is retained until after the log-determinant
           calculation.
+        - The Fisher matrices are always normalized using
+          `d * F / Tr(mean(F))`, independently of the `normalize` argument.
+        - `normalize=True` only normalizes the final returned GED values by
+          the model parameter count.
     """
     if array_of_theoretical_number_of_data_samples is None:
         array_of_theoretical_number_of_data_samples = [len(inputs)]
@@ -153,4 +170,7 @@ def estimate_global_effective_dimension(
 
         effective_dimensions.append(ged.item())
 
-    return effective_dimensions
+    if normalize:
+        return [value / d for value in effective_dimensions]
+    else:
+        return effective_dimensions

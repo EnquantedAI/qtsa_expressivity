@@ -308,6 +308,7 @@ Global effective dimension:
 ged = estimate_global_effective_dimension(
     net=net,
     inputs=inputs,
+    normalize=True,
     n_theta=100,
     array_of_theoretical_number_of_data_samples=[100, 1_000, 10_000],
 )
@@ -319,6 +320,7 @@ Local effective dimension:
 led = estimate_local_effective_dimension(
     net=net,
     inputs=inputs,
+    normalize=True,
     epsilon=0.1,
     n_theta=100,
     array_of_theoretical_number_of_data_samples=[100, 1_000, 10_000],

@@ -8,6 +8,7 @@ from .samplers import EpsilonBallParameterSpace
 def estimate_local_effective_dimension(
     net,
     inputs,
+    normalize=False,
     epsilon=0.1,
     n_theta=100,
     min_probability=1e-12,
@@ -53,6 +54,12 @@ def estimate_local_effective_dimension(
             CFIM. The expected shape is typically
             `(number_of_inputs, input_dimension)`.
 
+        normalize:
+            If `True`, divide every LED estimate by the model parameter count
+            `d`, returning a dimensionless value relative to the number of
+            trainable parameters. If `False`, return the standard LED estimate
+            in effective-dimension units. Default: False.
+
         epsilon:
             Radius of the local Euclidean parameter neighbourhood around the
             current model weights. Parameter vectors are sampled uniformly
@@ -77,6 +84,11 @@ def estimate_local_effective_dimension(
             theoretical dataset size, in the same order as
             `array_of_theoretical_number_of_data_samples`.
 
+            If `normalize=False`, each value is the standard LED estimate.
+
+            If `normalize=True`, each value is divided by `d`, the number of
+            trainable parameters
+
     Raises:
         ValueError:
             If a theoretical dataset size is at most one.
@@ -96,6 +108,10 @@ def estimate_local_effective_dimension(
           nonlinear log-determinant calculation.
         - For meaningful positive values, use theoretical dataset sizes for
           which kappa > 1.
+        - The Fisher matrices are always normalized using
+          `d * F / Tr(mean(F))`, independently of the `normalize` argument.
+        - `normalize=True` only normalizes the final returned LED values by
+          the model parameter count.
     """
     if array_of_theoretical_number_of_data_samples is None:
         array_of_theoretical_number_of_data_samples = [len(inputs)]
@@ -155,5 +171,8 @@ def estimate_local_effective_dimension(
         )
 
         effective_dimensions.append(led.item())
+
+    if normalize:
+        return [value / d for value in effective_dimensions]
 
     return effective_dimensions
