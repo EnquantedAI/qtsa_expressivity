@@ -22,7 +22,7 @@ def sweep_led_by_depth(
     depths,
     theoretical_dataset_size=1_000,
     n_theta=100,
-    epsilon_per_parameter=0.1,
+    epsilon=2,
     repetitions=5,
     normalize=True,
     seed=0,
@@ -56,10 +56,10 @@ def sweep_led_by_depth(
 
             net = model_factory(depth)
 
-            epsilon = (
-                epsilon_per_parameter
-                * math.sqrt(net.parameter_count)
-            )
+            # epsilon = (
+            #     epsilon
+            #     * math.sqrt(net.parameter_count)
+            # )
 
             led = estimate_local_effective_dimension(
                 net=net,
