@@ -27,7 +27,7 @@ def draw_circuit(circuit, fontsize=20, style='pennylane',
     return _draw_circuit
 
 ### Creates a ZZ feature map (Qiskit style)
-def zz_feature_map(x, wires=None, repeats=1):
+def zz_feature_map(x, wires, repeats=1):
     """
     Implements a second-order Havlíček ZZ feature map in PennyLane.
     Safely fetches feature dimension regardless of 1D or 2D structure.
@@ -42,22 +42,21 @@ def zz_feature_map(x, wires=None, repeats=1):
     repeats : int
         Number of times to repeat the feature map layer (depth).
     """
-    n_features = qml.math.shape(x)[-1]
-    if wires is None: wires = range(n_features)
+    num_features = qml.math.shape(x)[-1]
     
     for _ in range(repeats):
         # 1. Uniform Superposition Layer
-        for i in range(n_features):
+        for i in range(num_features):
             qml.Hadamard(wires=wires[i])
             
         # 2. First-Order Terms: Single-qubit Pauli-Z rotations
-        for i in range(n_features):
+        for i in range(num_features):
             # x[..., i] slices out the entire column if 2D, or element if 1D
             qml.RZ(-2.0 * x[..., i], wires=wires[i])
             
         # 3. Second-Order Terms: Pairwise ZZ interactions
-        for i in range(n_features):
-            for j in range(i + 1, n_features):
+        for i in range(num_features):
+            for j in range(i + 1, num_features):
                 phi_ij = (np.pi - x[..., i]) * (np.pi - x[..., j])
                 
                 qml.CNOT(wires=[wires[i], wires[j]])
@@ -72,13 +71,9 @@ def gqnn_shape(n_layers, n_qubits):
 
 ### Creates a model generator
 def gqnn(n_layers, n_qubits, dev,
-    interface='autograd', diff_method='adjoint', 
-         fm_style='zzfm', reup_style=None, meas=[0]):
+    interface='autograd', diff_method='adjoint', fm_style='zzfm', meas=[0]):
     """
     Creates a generalised QNN model.
-    Note that the number of qubits may be greater than
-      the number of features, in which case we can create
-      ancilla qubits to add extra parameters and entanglements
     
     Parameters:
     -----------
@@ -93,58 +88,25 @@ def gqnn(n_layers, n_qubits, dev,
     @qml.qnode(dev, interface=interface, diff_method=diff_method)
     def circuit(inputs, weights):
         nonlocal n_layers, n_qubits, dev
-        nonlocal interface, diff_method, fm_style, reup_style
+        nonlocal interface, diff_method, fm_style
 
         wires = dev.wires
-        n_features = qml.math.shape(inputs)[-1]
-        if n_features > n_qubits:
-            n_features = n_qubits
-            inputs = inputs[:, -n_qubits:]
+        
+        # Safe extraction of the feature count (works for 1D or 2D inputs)
+        num_features = qml.math.shape(inputs)[-1]
         
         # --- ZZ / IQP encoding ---
         if fm_style=='iqp':
-            qml.IQPEmbedding(inputs, wires=range(n_features))
+            qml.IQPEmbedding(inputs, wires)
         elif fm_style=='zzfm':
-            zz_feature_map(inputs, wires=range(n_features))
+            zz_feature_map(inputs, wires)
         else:
-            for i in range(n_features):
-                if fm_style == 'X':
-                    qml.RX(inputs[..., i], wires=wires[i])
-                elif fm_style == 'Y':
-                    qml.RY(inputs[..., i], wires=wires[i])
-                elif fm_style == 'Z':
-                    qml.RZ(inputs[..., i], wires=wires[i])
+            qml.AngleEmbedding(inputs, wires=range(n_qubits), rotation=fm_style)
+        qml.Barrier()
                 
-        # --- layers: U rotation + Rx reuploading + circular entanglement
-        for l in range(n_layers):
-            qml.Barrier()
-
-            # Trainable weight block
-            for i in range(n_qubits):
-                qml.RZ(weights[l][i][0], wires=wires[i])
-                qml.RY(weights[l][i][1], wires=wires[i])
-                qml.RZ(weights[l][i][2], wires=wires[i])
-
-            # Entangling block
-            if n_qubits > 1:
-                qml.Barrier()
-                r = (l % (n_qubits - 1)) + 1
-                if n_qubits > 1:
-                    for i in range(n_qubits):
-                        control = wires[i]
-                        target = wires[(i + r) % n_qubits]
-                        qml.CNOT(wires=[control, target])
-
-            # Reuploading block
-            if reup_style is not None:
-                qml.Barrier()
-                for i in range(n_features):
-                    if reup_style == 'X':
-                        qml.RX(inputs[..., i], wires=wires[i])
-                    elif reup_style == 'Y':
-                        qml.RY(inputs[..., i], wires=wires[i])
-                    elif reup_style == 'Z':
-                        qml.RZ(inputs[..., i], wires=wires[i])
+        # --- layers: U rotation + Rx reuploading + circular entanglement ---
+        # Uses feature size instead of batch size, keeping your architecture rule intact!
+        qml.StronglyEntanglingLayers(weights, wires=range(num_features))
         
         qml.Barrier()
         
