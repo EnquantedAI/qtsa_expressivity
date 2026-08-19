@@ -71,10 +71,9 @@ def gqnn_shape(n_layers, n_qubits):
     return shape
 
 ### Creates a model generator
-def gqnn(n_layers, n_qubits, dev,
-    interface='autograd', diff_method=None, 
-    fm_style='zzfm', reup_style=None, meas=[0],
-    add_snaps=False):
+def gqnn_v1(n_layers, n_qubits, dev,
+    interface='autograd', diff_method='adjoint', fm_style='zzfm', 
+    reupload=False, meas=[0]):
     """
     Creates a generalised QNN model.
     Note that the number of qubits may be greater than
@@ -85,16 +84,57 @@ def gqnn(n_layers, n_qubits, dev,
     -----------
     n_layers: number of layers
     n_qubits: number of qubits
-    dev, interface, diff_method: characteristics of the device on which the circuit will execute
     fm_style: string indicating the type of the feature map, possible values
         xxfm - for Havlicek ZZ feature map (Qiskit style)
         iqp - for PennyLane style IQP
         X | Y | Z - angle encoding with indicated rotation
-    reup_style: string indicating the type or reuploading layers, possible values
-        X | Y | Z - angle encoding with indicated rotation
-    meas: a list of qubits tobe measured
-    add_snaps: indicates whether or not take exec snapshots every layer
+    """
     
+    @qml.qnode(dev, interface=interface, diff_method=diff_method)
+    def circuit(inputs, weights):
+        nonlocal n_layers, n_qubits, dev
+        nonlocal interface, diff_method, fm_style
+        nonlocal reupload
+
+        wires = dev.wires
+        n_features = qml.math.shape(inputs)[-1]
+        
+        # --- ZZ / IQP encoding (entangles + phase-encodes the window)
+        if fm_style=='iqp':
+            qml.IQPEmbedding(inputs, wires=range(n_features))
+        elif fm_style=='zzfm':
+            zz_feature_map(inputs, wires=range(n_features))
+        else:
+            qml.AngleEmbedding(inputs, wires=range(n_features), rotation=fm_style)
+        qml.Barrier()
+                
+        # --- layers: U rotation + Rx reuploading + circular entanglement ---
+        qml.StronglyEntanglingLayers(weights, wires=range(n_qubits))
+        
+        qml.Barrier()
+        
+        return [qml.expval(qml.PauliZ(m)) for m in meas]
+        
+    return circuit
+
+### Creates a model generator
+def gqnn(n_layers, n_qubits, dev,
+    interface='autograd', diff_method='adjoint', 
+    fm_style='zzfm', reup_style=None, meas=[0]):
+    """
+    Creates a generalised QNN model.
+    Note that the number of qubits may be greater than
+      the number of features, in which case we can create
+      ancilla qubits to add extra parameters and entanglements
+    
+    Parameters:
+    -----------
+    n_layers: number of layers
+    n_qubits: number of qubits
+    fm_style: string indicating the type of the feature map, possible values
+        xxfm - for Havlicek ZZ feature map (Qiskit style)
+        iqp - for PennyLane style IQP
+        X | Y | Z - angle encoding with indicated rotation
     """
     
     @qml.qnode(dev, interface=interface, diff_method=diff_method)
@@ -122,10 +162,7 @@ def gqnn(n_layers, n_qubits, dev,
                     qml.RY(inputs[i], wires=wires[i])
                 elif fm_style == 'Z':
                     qml.RZ(inputs[i], wires=wires[i])
-
-        # --- Add a state snapshot
-        if add_snaps: qml.Snapshot('depth_0')  # psi_1, post feature map
-
+                
         # --- layers: U rotation + Rx reuploading + circular entanglement
         for l in range(n_layers):
             qml.Barrier()
@@ -156,13 +193,9 @@ def gqnn(n_layers, n_qubits, dev,
                         qml.RY(inputs[i], wires=wires[i])
                     elif reup_style == 'Z':
                         qml.RZ(inputs[i], wires=wires[i])
-
-            # Optional snapshot
-            if add_snaps: qml.Snapshot(f'depth_{l+1}')
         
         qml.Barrier()
-
-        # this return will be ignored by qml.snapshots wrapper
+        
         return [qml.expval(qml.PauliZ(m)) for m in meas]
         
     return circuit
