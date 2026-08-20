@@ -246,8 +246,7 @@ def multi_plot_flat_ts_with_start(
 #   labels, color, lines, marks: Plot features for each series
 #   other: standard plot properties
 def multi_plot_flat_ts(
-    X_list, y_list, vert_lines=[], vert_line_color='lightgray', 
-    horiz_lines=[], horiz_line_color='lightgray', horiz_line_label=None,
+    X_list, y_list, vert_lines=[], vert_line_color='lightgray',
     labels=None, colors=None, lines=None, markers=None, marker_colors=None,
     xlim=None, ylim=None, rcParams=(12, 6), dpi=72, xlabel='Range', ylabel='Target value',
     legend_cols=3, title='Time series plot', save_plot=None):
@@ -314,12 +313,6 @@ def multi_plot_flat_ts(
             plt.axvline(x = X_list[i][0]-sigma, color = vert_line_color, linestyle=vert_lines[i])
         plt.plot(X_list[i], y_list[i], linestyle=lines[i], marker=markers[i], 
                  color=colors[i], mec=colors[i], mfc=marker_colors[i], label=labels[i])
- 
-    for i in range(len(horiz_lines)):
-        if horiz_line_label is None:
-            plt.axhline(horiz_lines[i], color=horiz_line_color, ls='--', lw=1)
-        else:
-            plt.axhline(horiz_lines[i], color=horiz_line_color, ls='--', lw=1, label=horiz_line_label[i])
     
     plt.legend(loc='best', ncol=legend_cols)
     
