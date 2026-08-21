@@ -1,6 +1,6 @@
 # Effective Dimension review notes
 
-The current implementation builds a classical Fisher information matrix from computational-basis probabilities obtained from the statevector. This is a valid CFIM, but its interpretation depends on whether that measurement is the statistical model we want to study.
+The current implementation builds a classical Fisher information matrix from computational-basis probabilities obtained from the statevector. In the generic statistical notation $p_\theta(y\mid x)$, the output variable $y$ is identified here with the computational-basis measurement outcome $z$, so the implemented probabilities are $p_\theta(z\mid x)$. This is a valid CFIM, but its interpretation depends on whether that measurement is the statistical model we want to study.
 
 Things worth checking before a large run:
 
