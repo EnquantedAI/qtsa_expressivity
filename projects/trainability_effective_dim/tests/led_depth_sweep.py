@@ -1,5 +1,6 @@
 import math
 from dataclasses import dataclass
+from collections import OrderedDict
 
 import matplotlib.pyplot as plt
 import torch
@@ -159,3 +160,46 @@ def is_non_decreasing_with_tolerance(values, tolerance=0.05):
     values = torch.tensor(values, dtype=torch.float64)
     differences = values[1:] - values[:-1]
     return bool(torch.all(differences >= -tolerance))
+
+
+def load_trained_prefix(target_net, trained_net):
+    if target_net.n_qubits != trained_net.n_qubits:
+        raise ValueError(
+            "Target and trained networks must have the same number of qubits."
+        )
+
+    if target_net.n_layers > trained_net.n_layers:
+        raise ValueError(
+            f"Cannot construct depth-{target_net.n_layers} from a "
+            f"trained depth-{trained_net.n_layers} network."
+        )
+
+    trained_weights = trained_net.qlayers.weights
+    target_weights = target_net.qlayers.weights
+
+    expected_target_shape = target_net.weight_shape
+    expected_trained_shape = trained_net.weight_shape
+
+    if tuple(target_weights.shape) != tuple(expected_target_shape):
+        raise ValueError(
+            f"Unexpected target weight shape: {tuple(target_weights.shape)}. "
+            f"Expected: {tuple(expected_target_shape)}."
+        )
+
+    if tuple(trained_weights.shape) != tuple(expected_trained_shape):
+        raise ValueError(
+            f"Unexpected trained weight shape: {tuple(trained_weights.shape)}. "
+            f"Expected: {tuple(expected_trained_shape)}."
+        )
+
+    prefix_weights = trained_weights[
+        :target_net.n_layers
+    ].detach().to(
+        device=target_weights.device,
+        dtype=target_weights.dtype,
+    )
+
+    with torch.no_grad():
+        target_weights.copy_(prefix_weights)
+
+    return target_net
