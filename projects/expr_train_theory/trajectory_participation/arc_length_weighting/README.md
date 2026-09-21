@@ -4,18 +4,18 @@ Equal snapshot weights make trajectory participation depend partly on how often 
 
 For normalized states,
 
-$$
+```math
 d_{FS}(|\psi\rangle,|\phi\rangle)
 = \arccos |\langle\psi|\phi\rangle|.
-$$
+```
 
 The cumulative sum of consecutive distances gives a discrete projective arc length. Standard trapezoidal weights on that coordinate are then used in
 
-$$
+```math
 \rho_T = \sum_k w_k |\psi_k\rangle\langle\psi_k|,
 \qquad
 d_{TP}^{(FS)} = \frac{1}{\mathrm{Tr}(\rho_T^2)}.
-$$
+```
 
 This does not make trajectories from different circuit depths identical objects. An extra layer can genuinely change the path. The point is narrower: dense sampling of a slowly moving part of one path should not automatically give that region more weight just because more snapshots were recorded there.
 

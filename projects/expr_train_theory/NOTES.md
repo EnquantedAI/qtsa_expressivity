@@ -2,9 +2,9 @@
 
 For a fixed circuit architecture I use
 
-$$
+```math
 |\psi(x,\theta)\rangle = U(x,\theta)|0\rangle^{\otimes n},
-$$
+```
 
 where `x` is the input and `theta` contains trainable parameters.
 
@@ -18,13 +18,13 @@ The quantities used in the project describe different things:
 
 For a normalized pure state the QFIM convention in the code is
 
-$$
+```math
 F^Q_{ij}=4\,\mathrm{Re}\left(
 \langle \partial_i\psi|\partial_j\psi\rangle
 -\langle \partial_i\psi|\psi\rangle
 \langle \psi|\partial_j\psi\rangle
 \right).
-$$
+```
 
 The current reference implementation uses central finite differences. It is slow, but easy to check on small examples. The tests cover a single rotation, redundant parameters, independent rotations and a global phase.
 

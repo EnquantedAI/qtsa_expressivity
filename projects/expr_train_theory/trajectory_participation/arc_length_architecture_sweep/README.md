@@ -4,9 +4,9 @@ This check runs the equal-weight and Fubini--Study arc-length-weighted versions 
 
 For a trajectory $|\psi_0\rangle,\ldots,|\psi_L\rangle$, the equal-weight metric assigns every stored snapshot the same mass. The arc-length version uses the consecutive projective distances
 
-$$
+```math
 \Delta s_k=\arccos |\langle\psi_k|\psi_{k+1}\rangle|
-$$
+```
 
 and trapezoidal weights along the accumulated path length.
 

@@ -51,9 +51,9 @@ For every matched width/depth configuration, the pipeline combines:
 
 Across depths, the topology sweep also reports
 
-$$
+```math
 \frac{d_{TP}}{\min(L+1,2^n)},
-$$
+```
 
 so the larger trajectory ceiling created by adding snapshots is not itself interpreted as a topology effect.
 
