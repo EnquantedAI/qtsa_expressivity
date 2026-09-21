@@ -4,9 +4,9 @@ Small reference comparison between trajectory participation and a QNTK built fro
 
 For a Jacobian $J$ with samples in rows and parameters in columns, the kernel used here is
 
-$$
+```math
 K = J J^T.
-$$
+```
 
 The code keeps this independent of the implementation in `projects/expressivity_krylov/`. The point is to have a tiny NumPy reference for boundary tests and later comparison with the project QNTK pipeline.
 

@@ -5,7 +5,12 @@ from .core import (
     trajectory_participation_dimension_from_gram,
     trajectory_spectrum,
 )
-from .shared_qnn import shared_qnn_snapshots, z_expectation_from_state
+from .shared_qnn import (
+    native_shared_qnn_snapshots,
+    reference_shared_qnn_snapshots,
+    shared_qnn_snapshots,
+    z_expectation_from_state,
+)
 from .snapshots import angle_encoding, trajectory_snapshots
 from .study import TrajectoryStudyResult, analyse_toy_qnn_trajectory
 
@@ -14,6 +19,8 @@ __all__ = [
     "TrajectoryStudyResult",
     "analyse_toy_qnn_trajectory",
     "angle_encoding",
+    "native_shared_qnn_snapshots",
+    "reference_shared_qnn_snapshots",
     "shared_qnn_snapshots",
     "trajectory_gram",
     "trajectory_participation_dimension",

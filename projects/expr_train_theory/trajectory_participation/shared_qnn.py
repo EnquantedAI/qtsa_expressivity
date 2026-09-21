@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 import numpy as np
 
 try:
@@ -101,6 +103,93 @@ def shared_qnn_snapshots(
         [state_after(prefix) for prefix in range(n_layers + 1)],
         dtype=np.complex128,
     )
+
+
+# Explicit name for the independently reconstructed reference path.  Keep the
+# original public name for backwards compatibility with the existing studies.
+reference_shared_qnn_snapshots = shared_qnn_snapshots
+
+
+def _extract_depth_snapshots(snapshot_results, n_layers, n_qubits):
+    """Return ``depth_0`` ... ``depth_L`` snapshots as a state matrix.
+
+    ``qml.snapshots`` may include additional entries such as the final execution
+    result.  The trajectory adapter deliberately selects only the named depth
+    snapshots emitted by ``src.models.gqnn(add_snaps=True)``.
+    """
+    if not isinstance(snapshot_results, Mapping):
+        raise TypeError("snapshot_results must be a mapping")
+    if n_layers < 0:
+        raise ValueError("n_layers cannot be negative")
+    if n_qubits < 1:
+        raise ValueError("n_qubits must be positive")
+
+    expected_dim = 2**n_qubits
+    states = []
+    for depth in range(n_layers + 1):
+        key = f"depth_{depth}"
+        if key not in snapshot_results:
+            raise KeyError(f"missing shared-QNN snapshot {key!r}")
+        state = np.asarray(snapshot_results[key], dtype=np.complex128).reshape(-1)
+        if state.size != expected_dim:
+            raise ValueError(
+                f"snapshot {key!r} has dimension {state.size}, expected {expected_dim}"
+            )
+        states.append(state)
+
+    return np.asarray(states, dtype=np.complex128)
+
+
+def native_shared_qnn_snapshots(
+    inputs,
+    weights,
+    *,
+    n_qubits,
+    fm_style="zzfm",
+    reup_style=None,
+    device_name="default.qubit",
+    interface="autograd",
+    diff_method=None,
+):
+    """Collect trajectory states directly from the shared PennyLane QNN.
+
+    This is the integration path for experiments that should use the team's
+    canonical ``src.models.gqnn`` circuit.  The shared model is instantiated
+    with ``add_snaps=True`` and its ``depth_0`` ... ``depth_L`` states are
+    collected with ``qml.snapshots``.  No circuit layers are reconstructed in
+    this function.
+    """
+    _require_pennylane()
+
+    values = np.asarray(weights, dtype=float)
+    if values.ndim != 3:
+        raise ValueError("weights must have shape (layers, n_qubits, 3)")
+    n_layers = values.shape[0]
+    values = _check_weights(values, n_layers, n_qubits)
+
+    # Keep the original input shape here: src.models.gqnn owns the input
+    # trimming semantics, so this adapter follows the shared implementation
+    # rather than duplicating them.
+    feature_values = np.asarray(inputs, dtype=float).reshape(-1)
+    if feature_values.size == 0:
+        raise ValueError("inputs cannot be empty")
+
+    from src.models import gqnn
+
+    dev = qml.device(device_name, wires=n_qubits)
+    circuit = gqnn(
+        n_layers,
+        n_qubits,
+        dev,
+        interface=interface,
+        diff_method=diff_method,
+        fm_style=fm_style,
+        reup_style=reup_style,
+        meas=[0],
+        add_snaps=True,
+    )
+    snapshot_results = qml.snapshots(circuit)(feature_values, values)
+    return _extract_depth_snapshots(snapshot_results, n_layers, n_qubits)
 
 
 def z_expectation_from_state(state, wire, n_qubits):

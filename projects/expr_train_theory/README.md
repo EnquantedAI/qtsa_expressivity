@@ -1,12 +1,16 @@
 # Expressivity and trainability
 
-This folder contains my work on the mathematical side of the project. The code is split into four main areas:
+This folder contains my work on the mathematical side of the project. `mathematical_framework/` collects the shared backend-independent notation, definitions and abstract algorithms used across the metrics. The code is split into four main areas:
 
 - `qfim/` — a small pure-state QFIM implementation, analytical checks and a PennyLane adapter;
 - `effective_dimension_checks/` — simple CFIM/QFIM examples used while reviewing the effective-dimension code;
 - `krylov/` — Lanczos/Arnoldi routines and small experiments for checking possible Krylov-based diagnostics;
 - `trajectory_participation/` — a reference implementation of the layer-state participation idea based on the singular-value spectrum of a trajectory.
 
+
+## Mathematical framework
+
+The common definitions for trajectory participation, QFIM/CFIM, GED/LED and QNTK are collected in `mathematical_framework/`.  The framework separates the mathematical objects from NumPy/PyTorch/PennyLane implementations and records the conventions needed for cross-metric comparisons.
 
 ## Tests
 

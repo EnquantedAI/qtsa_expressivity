@@ -2,9 +2,9 @@
 
 For an operator $A$ and starting vector $v$,
 
-$$
+```math
 \mathcal K_m(A,v)=\mathrm{span}\{v,Av,\ldots,A^{m-1}v\}.
-$$
+```
 
 The current code covers:
 

@@ -11,17 +11,17 @@ The second example also shows why snapshot multiplicity matters. With equal snap
 
 For snapshots with weights $w_k$ I use
 
-$$
+```math
 \rho_T = \sum_k w_k |\psi_k\rangle\langle\psi_k|,
 \qquad
 \sum_k w_k = 1,
-$$
+```
 
 and
 
-$$
+```math
 d_{TP}^{(w)} = \frac{1}{\mathrm{Tr}(\rho_T^2)}.
-$$
+```
 
 For a uniformly sampled trajectory this reduces to the current equal-weight definition.
 
